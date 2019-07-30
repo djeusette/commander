@@ -21,14 +21,15 @@ defmodule Commander.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mode: {Commander.Application, []}
+      mod: {Commander.Application, []}
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ecto, ">= 3.1.7"}
+      { :elixir_uuid, "~> 1.2" },
+      { :ecto, ">= 3.1.7" }
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

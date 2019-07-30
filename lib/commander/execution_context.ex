@@ -4,6 +4,7 @@ defmodule Commander.ExecutionContext do
     :handler,
     :correlation_id,
     :timeout,
+    :async,
     metadata: %{}
   ]
 
@@ -16,7 +17,8 @@ defmodule Commander.ExecutionContext do
       handler_module: handler,
       correlation_id: correlation_id,
       metadata: metadata,
-      timeout: timeout
+      timeout: timeout,
+      async: async
     } = payload
 
     %ExecutionContext{
@@ -24,7 +26,8 @@ defmodule Commander.ExecutionContext do
       handler: handler,
       correlation_id: correlation_id,
       metadata: metadata,
-      timeout: timeout
+      timeout: timeout,
+      async: async
     }
   end
 end

@@ -7,13 +7,14 @@ defmodule Commander.Commands.Dispatcher do
       :async,
       :handler_module,
       :timeout,
+      :async,
       :metadata,
       middleware: []
     ]
   end
 
   alias Commander.Pipeline
-  alias Commander.Commands.Handler.ExecutionContext
+  alias Commander.ExecutionContext
 
   @type payload :: %Payload{}
   @type error :: term()
@@ -42,46 +43,63 @@ defmodule Commander.Commands.Dispatcher do
     execute_after_failure(pipeline, payload)
   end
 
-  defp run(%Pipeline{} = pipeline, %Payload{timeout: timeout} = payload) do
-    context = ExecutionContext.from_payload(payload)
+  defp run(%Pipeline{} = pipeline, %Payload{} = payload) do
+    ExecutionContext.from_payload(payload)
+    |> execute_task()
+    |> finish_pipeline(pipeline, payload)
+  end
 
-    task =
-      Task.Supervisor.async_nolink(
-        Commander.TaskDispatcher,
-        Commander.Commands.Handler,
-        :execute,
-        [context]
-      )
+  defp execute_task(%ExecutionContext{async: true} = context) do
+    task = start_task(context)
+    {:ok, task}
+  end
 
-    result =
-      case Task.yield(task, timeout) || Task.shutdown(task) do
-        {:ok, reply} -> reply
-        {:exit, error} -> {:error, :execution_failed, error}
-        nil -> {:error, :execution_timeout}
-      end
+  defp execute_task(%ExecutionContext{timeout: timeout, async: false} = context) do
+    task = start_task(context)
 
-    case result do
-      :ok ->
-        pipeline
-        |> execute_after_dispatch(payload)
-        |> Pipeline.respond(:ok)
-
-      {:ok, any} ->
-        pipeline
-        |> execute_after_dispatch(payload)
-        |> Pipeline.respond({:ok, any})
-
-      {:error, error} ->
-        pipeline
-        |> Pipeline.respond({:error, error})
-        |> execute_after_failure(payload)
-
-      {:error, error, reason} ->
-        pipeline
-        |> Pipeline.assign(:error_reason, reason)
-        |> Pipeline.respond({:error, error})
-        |> execute_after_failure(payload)
+    case Task.yield(task, timeout) || Task.shutdown(task) do
+      {:ok, reply} -> reply
+      {:exit, error} -> {:error, :execution_failed, error}
+      nil -> {:error, :execution_timeout}
     end
+  end
+
+  defp task_shutdown(%ExecutionContext{async: false}), do: :infinity
+  defp task_shutdown(%ExecutionContext{timeout: timeout, async: true}), do: timeout
+
+  defp start_task(%ExecutionContext{} = context) do
+    Task.Supervisor.async_nolink(
+      Commander.Commands.TaskDispatcher,
+      Commander.Commands.Handler,
+      :execute,
+      [context],
+      shutdown: task_shutdown(context)
+    )
+  end
+
+  defp finish_pipeline(:ok, %Pipeline{} = pipeline, %Payload{} = payload) do
+    pipeline
+    |> execute_after_dispatch(payload)
+    |> Pipeline.respond(:ok)
+  end
+
+  defp finish_pipeline({:ok, any}, %Pipeline{} = pipeline, %Payload{} = payload) do
+    pipeline
+    |> execute_after_dispatch(payload)
+    |> Pipeline.respond({:ok, any})
+  end
+
+  defp finish_pipeline({:error, error}, %Pipeline{} = pipeline, %Payload{} = payload) do
+    pipeline
+    |> Pipeline.respond({:error, error})
+    |> execute_after_failure(payload)
+  end
+
+  defp finish_pipeline({:error, error, reason}, %Pipeline{} = pipeline, %Payload{} = payload) do
+    pipeline
+    |> Pipeline.assign(:error_reason, reason)
+    |> Pipeline.respond({:error, error})
+    |> execute_after_failure(payload)
   end
 
   defp execute_after_dispatch(%Pipeline{} = pipeline, %Payload{middleware: middleware}) do

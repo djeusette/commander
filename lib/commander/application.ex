@@ -5,7 +5,7 @@ defmodule Commander.Application do
 
   def start(_type, _args) do
     children = [
-      {Task.Supervisor, name: Commander.Commands.TaskDispatcher}
+      { Task.Supervisor, name: Commander.Commands.TaskDispatcher }
     ]
 
     opts = [strategy: :one_for_one, name: Commander.Supervisor]

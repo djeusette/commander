@@ -13,6 +13,8 @@ defmodule Commander.Command do
       alias Commander.Support.Module
       alias Commander.Command.Builder
 
+      @type command :: struct()
+
       def new(params \\ %{}) do
         Module.to_struct(__MODULE__, params)
         |> Builder.build()
