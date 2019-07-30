@@ -49,8 +49,9 @@ defmodule Commander.Commands.Dispatcher do
     |> finish_pipeline(pipeline, payload)
   end
 
-  defp execute_task(%ExecutionContext{async: true} = context) do
-    task = start_task(context)
+  defp execute_task(%ExecutionContext{timeout: timeout, async: true} = context) do
+    %Task{pid: pid} = task = start_task(context)
+    :timer.kill_after(timeout, pid)
     {:ok, task}
   end
 
@@ -64,16 +65,12 @@ defmodule Commander.Commands.Dispatcher do
     end
   end
 
-  defp task_shutdown(%ExecutionContext{async: false}), do: :infinity
-  defp task_shutdown(%ExecutionContext{timeout: timeout, async: true}), do: timeout
-
   defp start_task(%ExecutionContext{} = context) do
     Task.Supervisor.async_nolink(
       Commander.Commands.TaskDispatcher,
       Commander.Commands.Handler,
       :execute,
-      [context],
-      shutdown: task_shutdown(context)
+      [context]
     )
   end
 
