@@ -64,6 +64,18 @@ defmodule Commander.RouterTest do
       )
     end
 
+    defmodule MultiDispatchRouter do
+      use Commander.Router
+
+      dispatch(
+        [
+          CommandBasicTest,
+          CommandResultTest
+        ],
+        to: CommandExecutionContextHandlerTest
+      )
+    end
+
     test "should dispatch command to registered command handler" do
       assert {:ok, "Bar"} = BasicTestRouter.dispatch(%CommandBasicTest{foo: "Bar"})
     end
@@ -227,6 +239,14 @@ defmodule Commander.RouterTest do
                  async: false,
                  timeout: 5823
                )
+    end
+
+    test "should dispatch different commands to the same handler" do
+      assert {:ok, %ExecutionContext{handler: CommandExecutionContextHandlerTest, command: %CommandBasicTest{}}} =
+               MultiDispatchRouter.dispatch(%CommandBasicTest{foo: "Bar"})
+
+      assert {:ok, %ExecutionContext{handler: CommandExecutionContextHandlerTest, command: %CommandResultTest{}}} =
+               MultiDispatchRouter.dispatch(%CommandResultTest{result: :ok})
     end
   end
 end

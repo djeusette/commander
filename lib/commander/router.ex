@@ -115,7 +115,9 @@ defmodule Commander.Router do
       defp fallback_if_nil(nil, [alternative | alternatives]),
         do: fallback_if_nil(alternative, alternatives)
 
-      defp fallback_if_nil(value, _), do: value
+      defp fallback_if_nil(nil, []), do: nil
+
+      defp fallback_if_nil(value, _) when not is_nil(value), do: value
     end
   end
 
