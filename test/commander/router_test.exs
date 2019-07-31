@@ -2,12 +2,16 @@ defmodule Commander.RouterTest do
   use ExUnit.Case
 
   describe "routing to command handler" do
-    alias Commander.Commands.{CommandBasicTest, CommandSleepTest}
+    alias Commander.ExecutionContext
+
+    alias Commander.Commands.{CommandBasicTest, CommandSleepTest, CommandResultTest}
 
     alias Commander.Commands.Handlers.{
       CommandBasicHandlerTest,
       CommandMetadataHandlerTest,
-      CommandSlowHandlerTest
+      CommandSlowHandlerTest,
+      CommandResultHandlerTest,
+      CommandExecutionContextHandlerTest
     }
 
     defmodule BasicTestRouter do
@@ -31,6 +35,32 @@ defmodule Commander.RouterTest do
 
       dispatch(CommandSleepTest,
         to: CommandSlowHandlerTest
+      )
+    end
+
+    defmodule ResultTestRouter do
+      use Commander.Router
+
+      dispatch(CommandResultTest,
+        to: CommandResultHandlerTest
+      )
+    end
+
+    defmodule DefaultExecutionContextRouter do
+      use Commander.Router
+
+      dispatch(CommandBasicTest,
+        to: CommandExecutionContextHandlerTest
+      )
+    end
+
+    defmodule CustomExecutionContextRouter do
+      use Commander.Router
+
+      dispatch(CommandBasicTest,
+        to: CommandExecutionContextHandlerTest,
+        async: true,
+        timeout: 5432
       )
     end
 
@@ -111,6 +141,92 @@ defmodule Commander.RouterTest do
       assert {:ok, %Task{} = task} = result
       :timer.sleep(timeout)
       assert {:exit, :killed} = Task.yield(task)
+    end
+
+    test "should dispatch command synchronously and return :ok" do
+      assert :ok = ResultTestRouter.dispatch(%CommandResultTest{result: :ok})
+    end
+
+    test "should dispatch command synchronously and return {:ok, \"foo\"}" do
+      assert {:ok, "foo"} = ResultTestRouter.dispatch(%CommandResultTest{result: {:ok, "foo"}})
+    end
+
+    test "should dispatch command synchronously and return {:error, :executation_timeout}" do
+      assert {:error, :execution_timeout} =
+               ResultTestRouter.dispatch(%CommandResultTest{result: {:error, :execution_timeout}})
+    end
+
+    test "should dispatch command synchronously and return {:error, :executation_failed, \"changeset\"}" do
+      assert {:error, :execution_failed, "changeset"} =
+               ResultTestRouter.dispatch(%CommandResultTest{
+                 result: {:error, :execution_failed, "changeset"}
+               })
+    end
+
+    test "should dispatch command synchronously with default timeout" do
+      assert {:ok, %ExecutionContext{async: false, timeout: 5000}} =
+               DefaultExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"})
+    end
+
+    test "should dispatch command synchronously with custom timeout passed as integer" do
+      assert {:ok, %ExecutionContext{async: false, timeout: 9320}} =
+               DefaultExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"}, 9320)
+    end
+
+    test "should dispatch command synchronously with custom timeout passed as option" do
+      assert {:ok, %ExecutionContext{async: false, timeout: 9320}} =
+               DefaultExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"}, timeout: 9320)
+    end
+
+    test "should dispatch command asynchronously with default timeout" do
+      assert {:ok, %Task{} = task} =
+               DefaultExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"}, async: true)
+
+      assert {:ok, %ExecutionContext{async: true, timeout: 5000}} = Task.await(task)
+    end
+
+    test "should dispatch command asynchronously with custom timeout" do
+      assert {:ok, %Task{} = task} =
+               DefaultExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"},
+                 async: true,
+                 timeout: 9111
+               )
+
+      assert {:ok, %ExecutionContext{async: true, timeout: 9111}} = Task.await(task)
+    end
+
+    test "should dispatch command asynchronously by default with custom timeout defined at router level" do
+      assert {:ok, %Task{} = task} =
+               CustomExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"})
+
+      assert {:ok, %ExecutionContext{async: true, timeout: 5432}} = Task.await(task)
+    end
+
+    test "should dispatch command asynchronously by default with custom timeout defined as integer at dispatch level" do
+      assert {:ok, %Task{} = task} =
+               CustomExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"}, 1234)
+
+      assert {:ok, %ExecutionContext{async: true, timeout: 1234}} = Task.await(task)
+    end
+
+    test "should dispatch command asynchronously by default with custom timeout defined in options at dispatch level" do
+      assert {:ok, %Task{} = task} =
+               CustomExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"}, timeout: 1235)
+
+      assert {:ok, %ExecutionContext{async: true, timeout: 1235}} = Task.await(task)
+    end
+
+    test "should dispatch command synchronously thanks to dispatch level option" do
+      assert {:ok, %ExecutionContext{async: false, timeout: 5432}} =
+               CustomExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"}, async: false)
+    end
+
+    test "should dispatch command synchronously thanks to dispatch level option with custom timeout" do
+      assert {:ok, %ExecutionContext{async: false, timeout: 5823}} =
+               CustomExecutionContextRouter.dispatch(%CommandBasicTest{foo: "Bar"},
+                 async: false,
+                 timeout: 5823
+               )
     end
   end
 end

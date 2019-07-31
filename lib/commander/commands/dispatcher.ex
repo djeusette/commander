@@ -94,8 +94,9 @@ defmodule Commander.Commands.Dispatcher do
 
   defp finish_pipeline({:error, error, reason}, %Pipeline{} = pipeline, %Payload{} = payload) do
     pipeline
+    |> Pipeline.assign(:error, error)
     |> Pipeline.assign(:error_reason, reason)
-    |> Pipeline.respond({:error, error})
+    |> Pipeline.respond({:error, error, reason})
     |> execute_after_failure(payload)
   end
 

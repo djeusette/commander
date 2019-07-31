@@ -89,7 +89,7 @@ defmodule Commander.Router do
 
       defp do_dispatch(%unquote(command_module){} = command, opts) do
         correlation_id = Keyword.get(opts, :correlation_id) || UUID.uuid4()
-        async = Keyword.get(opts, :async) || unquote(async) || @default[:async]
+        async = fallback_if_nil(Keyword.get(opts, :async), [unquote(async), @default[:async]])
         metadata = Keyword.get(opts, :metadata) || @default[:metadata]
         timeout = Keyword.get(opts, :timeout) || unquote(timeout) || @default[:dispatch_timeout]
 
@@ -109,6 +109,13 @@ defmodule Commander.Router do
 
         Dispatcher.dispatch(payload)
       end
+
+      defp fallback_if_nil(value, alternatives)
+
+      defp fallback_if_nil(nil, [alternative | alternatives]),
+        do: fallback_if_nil(alternative, alternatives)
+
+      defp fallback_if_nil(value, _), do: value
     end
   end
 
