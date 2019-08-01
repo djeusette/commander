@@ -9,6 +9,7 @@ defmodule Commander.Commands.Dispatcher do
       :timeout,
       :async,
       :metadata,
+      :include_pipeline,
       middleware: []
     ]
   end
@@ -28,7 +29,25 @@ defmodule Commander.Commands.Dispatcher do
 
     execute_before_dispatch(pipeline, payload)
     |> run(payload)
-    |> Pipeline.response()
+    |> response(payload)
+  end
+
+  defp response(%Pipeline{} = pipeline, %Payload{include_pipeline: false}), do: Pipeline.response(pipeline)
+  defp response(%Pipeline{} = pipeline, %Payload{include_pipeline: true}) do
+    case response_tag(pipeline) do
+      :ok -> {:ok, pipeline}
+      :error -> {:error, pipeline}
+    end
+  end
+
+  defp response_tag(%Pipeline{} = pipeline) do
+    case Pipeline.response(pipeline) do
+      :ok -> :ok
+      {:ok, _any} -> :ok
+      {:error, _error} -> :error
+      {:error, _error, _reason} -> :error
+      _ -> :ok
+    end
   end
 
   defp to_pipeline(%Payload{} = payload), do: struct(Pipeline, Map.from_struct(payload))
@@ -49,9 +68,9 @@ defmodule Commander.Commands.Dispatcher do
     |> finish_pipeline(pipeline, payload)
   end
 
-  defp execute_task(%ExecutionContext{timeout: timeout, async: true} = context) do
-    %Task{pid: pid} = task = start_task(context)
-    :timer.kill_after(timeout, pid)
+  defp execute_task(%ExecutionContext{async: true} = context) do
+    task = start_task(context)
+    kill_task_after(task, context)
     {:ok, task}
   end
 
@@ -63,6 +82,12 @@ defmodule Commander.Commands.Dispatcher do
       {:exit, error} -> {:error, :execution_failed, error}
       nil -> {:error, :execution_timeout}
     end
+  end
+
+  defp kill_task_after(%Task{}, %ExecutionContext{timeout: :infinity}), do: nil
+
+  defp kill_task_after(%Task{pid: pid}, %ExecutionContext{timeout: timeout}) do
+    :timer.kill_after(timeout, pid)
   end
 
   defp start_task(%ExecutionContext{} = context) do

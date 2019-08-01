@@ -2,7 +2,7 @@ defmodule Commander.RouterTest do
   use ExUnit.Case
 
   describe "routing to command handler" do
-    alias Commander.ExecutionContext
+    alias Commander.{ExecutionContext, Pipeline}
 
     alias Commander.Commands.{CommandBasicTest, CommandSleepTest, CommandResultTest}
 
@@ -159,8 +159,18 @@ defmodule Commander.RouterTest do
       assert :ok = ResultTestRouter.dispatch(%CommandResultTest{result: :ok})
     end
 
+    test "should dispatch command synchronously and return {:ok, %Pipeline{response: :ok}}" do
+      assert {:ok, %Pipeline{} = pipeline} = ResultTestRouter.dispatch(%CommandResultTest{result: :ok}, include_pipeline: true)
+      assert :ok = Pipeline.response(pipeline)
+    end
+
     test "should dispatch command synchronously and return {:ok, \"foo\"}" do
       assert {:ok, "foo"} = ResultTestRouter.dispatch(%CommandResultTest{result: {:ok, "foo"}})
+    end
+
+    test "should dispatch command synchronously and return {:ok, %Pipeline{response: {:ok, \"foo\"}}}" do
+      assert {:ok, %Pipeline{} = pipeline} = ResultTestRouter.dispatch(%CommandResultTest{result: {:ok, "foo"}}, include_pipeline: true)
+      assert {:ok, "foo"} = Pipeline.response(pipeline)
     end
 
     test "should dispatch command synchronously and return {:error, :executation_timeout}" do
@@ -168,11 +178,25 @@ defmodule Commander.RouterTest do
                ResultTestRouter.dispatch(%CommandResultTest{result: {:error, :execution_timeout}})
     end
 
+    test "should dispatch command synchronously and return {:error, %Pipeline{response: {:error, :execution_timeout}}}" do
+      assert {:error, %Pipeline{} = pipeline} =
+               ResultTestRouter.dispatch(%CommandResultTest{result: {:error, :execution_timeout}}, include_pipeline: true)
+      assert {:error, :execution_timeout} = Pipeline.response(pipeline)
+    end
+
     test "should dispatch command synchronously and return {:error, :executation_failed, \"changeset\"}" do
       assert {:error, :execution_failed, "changeset"} =
                ResultTestRouter.dispatch(%CommandResultTest{
                  result: {:error, :execution_failed, "changeset"}
                })
+    end
+
+    test "should dispatch command synchronously and return {:error, %Pipeline{response: {:error, :execution_failed, \"changeset\"}}}" do
+      assert {:error, %Pipeline{} = pipeline} =
+               ResultTestRouter.dispatch(%CommandResultTest{
+                 result: {:error, :execution_failed, "changeset"}
+               }, include_pipeline: true)
+      assert {:error, :execution_failed, "changeset"} = Pipeline.response(pipeline)
     end
 
     test "should dispatch command synchronously with default timeout" do
@@ -242,11 +266,17 @@ defmodule Commander.RouterTest do
     end
 
     test "should dispatch different commands to the same handler" do
-      assert {:ok, %ExecutionContext{handler: CommandExecutionContextHandlerTest, command: %CommandBasicTest{}}} =
-               MultiDispatchRouter.dispatch(%CommandBasicTest{foo: "Bar"})
+      assert {:ok,
+              %ExecutionContext{
+                handler: CommandExecutionContextHandlerTest,
+                command: %CommandBasicTest{}
+              }} = MultiDispatchRouter.dispatch(%CommandBasicTest{foo: "Bar"})
 
-      assert {:ok, %ExecutionContext{handler: CommandExecutionContextHandlerTest, command: %CommandResultTest{}}} =
-               MultiDispatchRouter.dispatch(%CommandResultTest{result: :ok})
+      assert {:ok,
+              %ExecutionContext{
+                handler: CommandExecutionContextHandlerTest,
+                command: %CommandResultTest{}
+              }} = MultiDispatchRouter.dispatch(%CommandResultTest{result: :ok})
     end
   end
 end

@@ -18,6 +18,7 @@ defmodule Commander.Router do
         middleware: [],
         async: Application.get_env(:commander, :async, false),
         dispatch_timeout: 5_000,
+        include_pipeline: false,
         metadata: %{}
       ]
     end
@@ -92,6 +93,7 @@ defmodule Commander.Router do
         async = fallback_if_nil(Keyword.get(opts, :async), [unquote(async), @default[:async]])
         metadata = Keyword.get(opts, :metadata) || @default[:metadata]
         timeout = Keyword.get(opts, :timeout) || unquote(timeout) || @default[:dispatch_timeout]
+        include_pipeline = Keyword.get(opts, :include_pipeline) || @default[:include_pipeline]
 
         alias Commander.Commands.Dispatcher
         alias Commander.Commands.Dispatcher.Payload
@@ -104,6 +106,7 @@ defmodule Commander.Router do
           handler_module: unquote(handler),
           timeout: timeout,
           metadata: metadata,
+          include_pipeline: include_pipeline,
           middleware: @registered_middleware ++ @default[:middleware]
         }
 
