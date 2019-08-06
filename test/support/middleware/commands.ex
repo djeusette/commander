@@ -4,26 +4,31 @@ defmodule Commander.Middleware.Commands do
   defmodule IncrementCount do
     @moduledoc false
     defstruct uuid: nil, by: 1
+    use Commander.Command
   end
 
   defmodule Fail do
     @moduledoc false
     defstruct [:uuid]
+    use Commander.Command
   end
 
   defmodule RaiseError do
     @moduledoc false
     defstruct [:uuid]
+    use Commander.Command
   end
 
   defmodule Timeout do
     @moduledoc false
     defstruct [:uuid]
+    use Commander.Command
   end
 
   defmodule Validate do
     @moduledoc false
     defstruct [:uuid, :valid?]
+    use Commander.Command
   end
 
   defmodule CommandHandler do

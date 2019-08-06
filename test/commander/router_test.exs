@@ -99,8 +99,8 @@ defmodule Commander.RouterTest do
           SlowCommandHandlerTestRouter.dispatch(%CommandSleepTest{sleep: sleep_ms}, timeout: 200)
         end)
 
-      # Allow 10 milliseconds of execution
-      assert abs(round(microseconds / 1000) - sleep_ms) < 10
+      # Allow 20 milliseconds of execution
+      assert abs(round(microseconds / 1000) - sleep_ms) < 20
       assert {:ok, ^sleep_ms} = result
     end
 
@@ -156,45 +156,45 @@ defmodule Commander.RouterTest do
     end
 
     test "should dispatch command synchronously and return :ok" do
-      assert :ok = ResultTestRouter.dispatch(%CommandResultTest{result: :ok})
+      assert :ok = ResultTestRouter.dispatch(%CommandResultTest{result: %{tag: :ok}})
     end
 
     test "should dispatch command synchronously and return {:ok, %Pipeline{response: :ok}}" do
-      assert {:ok, %Pipeline{} = pipeline} = ResultTestRouter.dispatch(%CommandResultTest{result: :ok}, include_pipeline: true)
+      assert {:ok, %Pipeline{} = pipeline} = ResultTestRouter.dispatch(%CommandResultTest{result: %{tag: :ok}}, include_pipeline: true)
       assert :ok = Pipeline.response(pipeline)
     end
 
     test "should dispatch command synchronously and return {:ok, \"foo\"}" do
-      assert {:ok, "foo"} = ResultTestRouter.dispatch(%CommandResultTest{result: {:ok, "foo"}})
+      assert {:ok, "foo"} = ResultTestRouter.dispatch(%CommandResultTest{result: %{tag: :ok, value: "foo"}})
     end
 
     test "should dispatch command synchronously and return {:ok, %Pipeline{response: {:ok, \"foo\"}}}" do
-      assert {:ok, %Pipeline{} = pipeline} = ResultTestRouter.dispatch(%CommandResultTest{result: {:ok, "foo"}}, include_pipeline: true)
+      assert {:ok, %Pipeline{} = pipeline} = ResultTestRouter.dispatch(%CommandResultTest{result: %{tag: :ok, value: "foo"}}, include_pipeline: true)
       assert {:ok, "foo"} = Pipeline.response(pipeline)
     end
 
     test "should dispatch command synchronously and return {:error, :executation_timeout}" do
       assert {:error, :execution_timeout} =
-               ResultTestRouter.dispatch(%CommandResultTest{result: {:error, :execution_timeout}})
+               ResultTestRouter.dispatch(%CommandResultTest{result: %{tag: :error, value: :execution_timeout}})
     end
 
     test "should dispatch command synchronously and return {:error, %Pipeline{response: {:error, :execution_timeout}}}" do
       assert {:error, %Pipeline{} = pipeline} =
-               ResultTestRouter.dispatch(%CommandResultTest{result: {:error, :execution_timeout}}, include_pipeline: true)
+               ResultTestRouter.dispatch(%CommandResultTest{result: %{tag: :error, value: :execution_timeout}}, include_pipeline: true)
       assert {:error, :execution_timeout} = Pipeline.response(pipeline)
     end
 
     test "should dispatch command synchronously and return {:error, :executation_failed, \"changeset\"}" do
       assert {:error, :execution_failed, "changeset"} =
                ResultTestRouter.dispatch(%CommandResultTest{
-                 result: {:error, :execution_failed, "changeset"}
+                 result: %{tag: :error, value: :execution_failed, reason: "changeset"}
                })
     end
 
     test "should dispatch command synchronously and return {:error, %Pipeline{response: {:error, :execution_failed, \"changeset\"}}}" do
       assert {:error, %Pipeline{} = pipeline} =
                ResultTestRouter.dispatch(%CommandResultTest{
-                 result: {:error, :execution_failed, "changeset"}
+                 result: %{tag: :error, value: :execution_failed, reason: "changeset"}
                }, include_pipeline: true)
       assert {:error, :execution_failed, "changeset"} = Pipeline.response(pipeline)
     end
@@ -276,7 +276,7 @@ defmodule Commander.RouterTest do
               %ExecutionContext{
                 handler: CommandExecutionContextHandlerTest,
                 command: %CommandResultTest{}
-              }} = MultiDispatchRouter.dispatch(%CommandResultTest{result: :ok})
+              }} = MultiDispatchRouter.dispatch(%CommandResultTest{result: %{tag: :ok}})
     end
   end
 end
