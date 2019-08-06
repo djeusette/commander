@@ -15,7 +15,9 @@ defmodule Commander.Router do
       @registered_middleware []
 
       @default [
-        middleware: [],
+        middleware: [
+          Commander.Middlewares.ValidateCommand
+        ],
         async: Application.get_env(:commander, :async, false),
         dispatch_timeout: 5_000,
         include_pipeline: false,

@@ -6,7 +6,18 @@ defmodule Commander.Commands.Handlers.CommandResultHandlerTest do
   alias Commander.ExecutionContext
 
   @impl Handler
-  def handle(%CommandResultTest{result: result}, %ExecutionContext{}) do
-    result
+  def handle(%CommandResultTest{result: %{tag: tag, value: value, reason: reason}}, %ExecutionContext{}) do
+    {tag, value, reason}
   end
+
+  @impl Handler
+  def handle(%CommandResultTest{result: %{tag: tag, value: value}}, %ExecutionContext{}) do
+    {tag, value}
+  end
+
+  @impl Handler
+  def handle(%CommandResultTest{result: %{tag: tag}}, %ExecutionContext{}) do
+    tag
+  end
+
 end

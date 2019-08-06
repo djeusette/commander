@@ -37,6 +37,13 @@ defmodule Commander.Command do
           true -> :ok
         end
       end
+
+      def required_keys, do: []
+      def schema, do: %{}
+      def validate(%Ecto.Changeset{} = changeset, _command), do: changeset
+      defoverridable(required_keys: 0)
+      defoverridable(schema: 0)
+      defoverridable(validate: 2)
     end
   end
 
