@@ -23,7 +23,7 @@ defmodule Commander.Commands.Dispatcher do
   @doc """
   Dispatch the given command to the handler module
   """
-  @spec dispatch(payload) :: :ok | {:error, error}
+  @spec dispatch(payload) :: :ok | {:ok, any} | {:error, error} | {:error, error, reason :: term}
   def dispatch(%Payload{} = payload) do
     pipeline = to_pipeline(payload)
 

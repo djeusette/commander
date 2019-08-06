@@ -72,8 +72,21 @@ defmodule Commander.Router do
       ensure_module_exists(unquote(command_module))
       ensure_module_exists(unquote(handler))
 
+      unless function_exported?(unquote(handler), :handle, 2) do
+        raise ArgumentError,
+          message:
+            "Command handler `#{inspect(unquote(handler))}` does not define a :handle/2 function"
+      end
+
       @registered_commands [unquote(command_module) | @registered_commands]
 
+      @spec dispatch(command :: struct, timeout_or_opts :: integer | :infinity | keyword()) ::
+              :ok
+              | {:ok, result :: any}
+              | {:ok, pipeline :: %Commander.Pipeline{}}
+              | {:error, :unregistered_command}
+              | {:error, error :: term}
+              | {:error, error :: term, reason :: term}
       def dispatch(command)
       def dispatch(%unquote(command_module){} = command), do: do_dispatch(command, [])
 
