@@ -1,23 +1,53 @@
 defmodule Commander.MixProject do
   use Mix.Project
 
+  @version "1.2.0"
+
   def project do
     [
       app: :commander,
-      version: "1.1.0",
+      version: @version,
+      description: description(),
+      package: package(),
+      aliases: aliases(),
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      name: "Commander",
+      source_url: "https://github.com/bettorplace/commander"
     ]
   end
 
-  # Specifies which paths to compile per environment.
+  defp description do
+    """
+    Library used to execute commands in a structured way
+    """
+  end
+
+  defp package do
+    [
+      files: [
+        "lib",
+        "mix.exs",
+        ".formatter.exs",
+        "README*",
+        "LICENSE*",
+        "test/commander",
+        "test/support"
+      ],
+      maintainers: ["David Jeusette"],
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => "https://github.com/bettorplace/commander"
+      }
+    ]
+  end
+
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(:dev), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger],
@@ -25,13 +55,14 @@ defmodule Commander.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
+  defp aliases do
+    []
+  end
+
   defp deps do
     [
       {:elixir_uuid, "~> 1.2"},
       {:ecto, ">= 3.1.7"}
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]
   end
 end
