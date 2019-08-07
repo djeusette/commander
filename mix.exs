@@ -1,7 +1,7 @@
 defmodule Commander.MixProject do
   use Mix.Project
 
-  @version "1.2.0"
+  @version "1.2.1"
 
   def project do
     [
@@ -62,7 +62,8 @@ defmodule Commander.MixProject do
   defp deps do
     [
       {:elixir_uuid, "~> 1.2"},
-      {:ecto, ">= 3.1.7"}
+      {:ecto, ">= 3.1.7"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 end
