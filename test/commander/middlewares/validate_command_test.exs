@@ -1,12 +1,12 @@
 defmodule Commander.Middlewares.ValidateCommandTest do
-  use ExUnit.Case
+  use Commander.DataCase
 
   describe "ValidateCommand middleware" do
     alias Commander.Commands.CommandBasicTest
     alias Commander.Commands.Handlers.CommandBasicHandlerTest
 
     defmodule BasicTestRouter do
-      use Commander.Router
+      use Commander.Router, repo: Commander.Repo
 
       dispatch(CommandBasicTest,
         to: CommandBasicHandlerTest
@@ -19,15 +19,14 @@ defmodule Commander.Middlewares.ValidateCommandTest do
              [foo: {"can't be blank", [validation: :required]}]} = BasicTestRouter.dispatch(cmd)
     end
 
-    test "halts the pipeline in case of error" do
-      cmd = CommandBasicTest.new(%{})
-      assert {:error, %Commander.Pipeline{halted: true, response: {:error, :validation_failure,
-             [foo: {"can't be blank", [validation: :required]}]}}} = BasicTestRouter.dispatch(cmd, include_pipeline: true)
-    end
-
     test "does not halt the pipeline when the command is valid" do
       cmd = CommandBasicTest.new(%{foo: "foo"})
-      assert {:ok, %Commander.Pipeline{halted: false, response: {:ok, "foo"}}} = BasicTestRouter.dispatch(cmd, include_pipeline: true)
+      assert {:ok, %{Commander.Commands.CommandBasicTest => {:ok, "foo"}}} = BasicTestRouter.dispatch(cmd)
+    end
+
+    test "allows use of metadata" do
+      cmd = CommandBasicTest.new(%{foo: "foo"})
+      assert {:ok, %{Commander.Commands.CommandBasicTest => {:ok, "Dav"}}} = BasicTestRouter.dispatch(cmd, metadata: %{user: "Dav"})
     end
   end
 end

@@ -5,9 +5,8 @@ defmodule Commander.Commands.Handlers.CommandSlowHandlerTest do
   alias Commander.Commands.CommandSleepTest
   alias Commander.ExecutionContext
 
-  @impl Handler
-  def handle(%CommandSleepTest{sleep: sleep}, %ExecutionContext{}) do
+  handle(%CommandSleepTest{sleep: sleep}, fn _repos, _changes ->
     :timer.sleep(sleep)
-    {:ok, sleep}
-  end
+    {:ok, {:ok, sleep}}
+  end)
 end

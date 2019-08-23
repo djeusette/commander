@@ -5,19 +5,15 @@ defmodule Commander.Commands.Handlers.CommandResultHandlerTest do
   alias Commander.Commands.CommandResultTest
   alias Commander.ExecutionContext
 
-  @impl Handler
-  def handle(%CommandResultTest{result: %{tag: tag, value: value, reason: reason}}, %ExecutionContext{}) do
-    {tag, value, reason}
-  end
+  handle(%CommandResultTest{result: %{tag: tag, value: value, reason: reason}}, fn _repos, _changes ->
+    {:ok, {tag, value, reason}}
+  end)
 
-  @impl Handler
-  def handle(%CommandResultTest{result: %{tag: tag, value: value}}, %ExecutionContext{}) do
-    {tag, value}
-  end
+  handle(%CommandResultTest{result: %{tag: tag, value: value}}, fn _repos, _changes ->
+    {:ok, {tag, value}}
+  end)
 
-  @impl Handler
-  def handle(%CommandResultTest{result: %{tag: tag}}, %ExecutionContext{}) do
-    tag
-  end
-
+  handle(%CommandResultTest{result: %{tag: tag}}, fn _repos, _changes ->
+    {:ok, tag}
+  end)
 end

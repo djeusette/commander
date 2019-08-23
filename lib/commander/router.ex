@@ -1,15 +1,20 @@
 defmodule Commander.Router do
   @register_params [
-    :to,
-    :timeout,
-    :async
+    :to
   ]
 
-  defmacro __using__(_opts) do
-    quote do
+  defmacro __using__(opts) do
+    opts = opts || []
+
+    quote location: :keep do
       require Logger
 
       import unquote(__MODULE__)
+      @before_compile unquote(__MODULE__)
+
+      @opts unquote(opts)
+      @repo @opts[:repo] ||
+              raise("Commander.Router expects :repo to be configured")
 
       @registered_commands []
       @registered_middleware []
@@ -19,10 +24,113 @@ defmodule Commander.Router do
           Commander.Middlewares.ValidateCommand
         ],
         async: Application.get_env(:commander, :async, false),
-        dispatch_timeout: 5_000,
+        timeout: 5_000,
         include_pipeline: false,
         metadata: %{}
       ]
+
+      @type changes :: Map.t()
+      @type error :: term()
+      @type reason :: term()
+      @type failed_operation :: term()
+      @type failed_value :: any
+      @type changes_so_far :: Map.t()
+
+      @spec dispatch(command :: struct(), opts :: keyword()) ::
+        {:ok, changes} |
+        {:ok, pid} |
+        {:error, error} |
+        {:error, :validation_failed, reason} |
+        {:error, :task_exited, error} |
+        {:error, :execution_timeout} |
+        {:error,  failed_operation, failed_value, changes_so_far}
+      def dispatch(command)
+      def dispatch(commands) when is_list(commands) do
+        opts = build_options([])
+        do_dispatch_multiple_commands(commands, opts)
+        |> run_transaction(opts)
+      end
+      def dispatch(command) do
+        opts = build_options([])
+        do_dispatch(command, opts)
+        |> run_transaction(opts)
+      end
+
+      def dispatch(command, opts)
+      def dispatch(commands, opts) when is_list(commands) do
+        opts = build_options(opts)
+        do_dispatch_multiple_commands(commands, opts)
+        |> run_transaction(opts)
+      end
+      def dispatch(command, opts) do
+        opts = build_options(opts)
+        do_dispatch(command, opts)
+        |> run_transaction(opts)
+      end
+
+      defp do_dispatch_multiple_commands(commands, opts) do
+        correlation_id = Keyword.fetch!(opts, :correlation_id)
+        initial_multi = Keyword.fetch!(opts, :multi)
+        repo = Keyword.fetch!(opts, :repo)
+        metadata = Keyword.fetch!(opts, :metadata)
+
+        Enum.reduce_while(commands, initial_multi, fn (command, multi_acc) ->
+          do_dispatch(command, [multi: multi_acc, correlation_id: correlation_id, metadata: metadata])
+          |> case do
+            %Ecto.Multi{} = multi -> {:cont, multi}
+            {:error, error} -> {:halt, {:error, error}}
+            {:error, error, reason} -> {:halt, {:error, error, reason}}
+          end
+        end)
+      end
+
+      defp run_transaction(%Ecto.Multi{} = multi, opts) do
+        async = Keyword.fetch!(opts, :async)
+        timeout = Keyword.fetch!(opts, :timeout)
+        correlation_id = Keyword.fetch!(opts, :correlation_id)
+        metadata = Keyword.fetch!(opts, :metadata)
+        repo = Keyword.fetch!(opts, :repo)
+
+        execution_context = %Commander.ExecutionContext{
+          correlation_id: correlation_id,
+          timeout: timeout,
+          async: async,
+          metadata: metadata,
+          multi: multi,
+          repo: repo
+        }
+
+        Commander.Commands.Runner.execute(execution_context)
+      end
+      defp run_transaction({:error, error}, _opts), do: {:error, error}
+      defp run_transaction({:error, error, reason}, _opts), do: {:error, error, reason}
+
+      defp build_options(opts) do
+        correlation_id = Keyword.get_lazy(opts, :correlation_id, &UUID.uuid4/0)
+        multi = Keyword.get_lazy(opts, :multi, &Ecto.Multi.new/0)
+        repo = Keyword.get(opts, :repo, @repo)
+        metadata = Keyword.get(opts, :metadata, @default[:metadata])
+        async = fallback_if_nil(Keyword.get(opts, :async), [@default[:async]])
+        timeout = Keyword.get(opts, :timeout, @default[:timeout])
+
+        [
+          correlation_id: correlation_id,
+          multi: multi,
+          repo: repo,
+          metadata: metadata,
+          async: async,
+          timeout: timeout
+        ]
+      end
+
+      defp fallback_if_nil(value, alternatives)
+
+      defp fallback_if_nil(nil, [alternative | alternatives]),
+        do: fallback_if_nil(alternative, alternatives)
+
+      defp fallback_if_nil(nil, []), do: nil
+
+      defp fallback_if_nil(value, _) when not is_nil(value), do: value
     end
   end
 
@@ -57,9 +165,7 @@ defmodule Commander.Router do
   end
 
   defmacro register(command_module,
-             to: handler,
-             timeout: timeout,
-             async: async
+             to: handler
            ) do
     quote location: :keep do
       if Enum.member?(@registered_commands, unquote(command_module)) do
@@ -74,68 +180,48 @@ defmodule Commander.Router do
       ensure_module_exists(unquote(command_module))
       ensure_module_exists(unquote(handler))
 
-      unless function_exported?(unquote(handler), :handle, 2) do
+      unless function_exported?(unquote(handler), :handle, 3) do
         raise ArgumentError,
           message:
-            "Command handler `#{inspect(unquote(handler))}` does not define a :handle/2 function"
+            "Command handler `#{inspect(unquote(handler))}` does not define a :handle/3 function or call the handle/2 or handle/3 macro"
       end
 
       @registered_commands [unquote(command_module) | @registered_commands]
 
-      @spec dispatch(command :: struct, timeout_or_opts :: integer | :infinity | keyword()) ::
-              :ok
-              | {:ok, result :: any}
-              | {:ok, pipeline :: %Commander.Pipeline{}}
-              | {:error, :unregistered_command}
-              | {:error, error :: term}
-              | {:error, error :: term, reason :: term}
-      def dispatch(command)
-      def dispatch(%unquote(command_module){} = command), do: do_dispatch(command, [])
-
-      def dispatch(command, timeout_or_opts)
-
-      def dispatch(%unquote(command_module){} = command, :infinity),
-        do: do_dispatch(command, timeout: :infinity)
-
-      def dispatch(%unquote(command_module){} = command, timeout) when is_integer(timeout),
-        do: do_dispatch(command, timeout: timeout)
-
-      def dispatch(%unquote(command_module){} = command, opts),
-        do: do_dispatch(command, opts)
-
       defp do_dispatch(%unquote(command_module){} = command, opts) do
-        correlation_id = Keyword.get(opts, :correlation_id) || UUID.uuid4()
-        async = fallback_if_nil(Keyword.get(opts, :async), [unquote(async), @default[:async]])
-        metadata = Keyword.get(opts, :metadata) || @default[:metadata]
-        timeout = Keyword.get(opts, :timeout) || unquote(timeout) || @default[:dispatch_timeout]
-        include_pipeline = Keyword.get(opts, :include_pipeline) || @default[:include_pipeline]
+        correlation_id = Keyword.fetch!(opts, :correlation_id)
+        multi = Keyword.fetch!(opts, :multi)
+        metadata = Keyword.fetch!(opts, :metadata)
 
-        alias Commander.Commands.Dispatcher
-        alias Commander.Commands.Dispatcher.Payload
-
-        payload = %Payload{
+        payload = %Commander.Commands.Dispatcher.Payload{
           command: command,
           command_uuid: UUID.uuid4(),
           correlation_id: correlation_id,
-          async: async,
+          multi: multi,
           handler_module: unquote(handler),
-          timeout: timeout,
           metadata: metadata,
-          include_pipeline: include_pipeline,
-          middleware: @registered_middleware ++ @default[:middleware]
+          middlewares: @registered_middleware ++ @default[:middleware]
         }
 
-        Dispatcher.dispatch(payload)
+        Commander.Commands.Dispatcher.dispatch(payload)
       end
+    end
+  end
 
-      defp fallback_if_nil(value, alternatives)
+  defmacro __before_compile__(_env) do
+    quote generated: true do
+      @doc false
 
-      defp fallback_if_nil(nil, [alternative | alternatives]),
-        do: fallback_if_nil(alternative, alternatives)
+      defp do_dispatch(command, _opts), do: unregistered_command(command)
 
-      defp fallback_if_nil(nil, []), do: nil
+      defp unregistered_command(command) do
+        _ =
+          Logger.error(fn ->
+            "attempted to dispatch an unregistered command: #{inspect(command)}"
+          end)
 
-      defp fallback_if_nil(value, _) when not is_nil(value), do: value
+        {:error, :unregistered_command}
+      end
     end
   end
 

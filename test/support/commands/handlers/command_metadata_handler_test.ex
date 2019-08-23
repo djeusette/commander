@@ -5,8 +5,7 @@ defmodule Commander.Commands.Handlers.CommandMetadataHandlerTest do
   alias Commander.Commands.CommandBasicTest
   alias Commander.ExecutionContext
 
-  @impl Handler
-  def handle(%CommandBasicTest{}, %ExecutionContext{metadata: metadata}) do
-    {:ok, metadata}
-  end
+  handle(%CommandBasicTest{}, metadata, fn _repo, _changes ->
+    {:ok, {:ok, metadata}}
+  end)
 end

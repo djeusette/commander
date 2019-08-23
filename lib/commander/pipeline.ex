@@ -3,7 +3,6 @@ defmodule Commander.Pipeline do
             correlation_id: nil,
             command: nil,
             command_uuid: nil,
-            async: false,
             halted: false,
             metadata: nil,
             response: nil
@@ -12,7 +11,7 @@ defmodule Commander.Pipeline do
 
   @type pipeline :: %Pipeline{}
   @type stage :: :before_dispatch | :after_failure | :after_dispatch
-  @type middleware :: List.t()
+  @type middlewares :: List.t()
 
   @doc """
   Puts the `key` with value equal to `value` into `assigns` map.
@@ -65,13 +64,13 @@ defmodule Commander.Pipeline do
   @doc """
   Executes the middleware chain.
   """
-  @spec chain(pipeline, stage, middleware) :: pipeline
-  def chain(pipeline, stage, middleware)
+  @spec chain(pipeline, stage, middlewares) :: pipeline
+  def chain(pipeline, stage, middlewares)
   def chain(%Pipeline{} = pipeline, _stage, []), do: pipeline
   def chain(%Pipeline{halted: true} = pipeline, :before_dispatch, _middleware), do: pipeline
   def chain(%Pipeline{halted: true} = pipeline, :after_dispatch, _middleware), do: pipeline
 
-  def chain(%Pipeline{} = pipeline, stage, [module | modules]) do
-    chain(apply(module, stage, [pipeline]), stage, modules)
+  def chain(%Pipeline{} = pipeline, stage, [middleware | pending_middlewares]) do
+    chain(apply(middleware, stage, [pipeline]), stage, pending_middlewares)
   end
 end

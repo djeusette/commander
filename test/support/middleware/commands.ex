@@ -19,6 +19,12 @@ defmodule Commander.Middleware.Commands do
     use Commander.Command
   end
 
+  defmodule MultiRunError do
+    @moduledoc false
+    defstruct [:uuid]
+    use Commander.Command
+  end
+
   defmodule Timeout do
     @moduledoc false
     defstruct [:uuid]
@@ -33,27 +39,31 @@ defmodule Commander.Middleware.Commands do
 
   defmodule CommandHandler do
     @moduledoc false
-    @behaviour Commander.Commands.Handler
+    use Commander.Commands.Handler
 
-    def handle(%IncrementCount{by: by}, _context) do
-      {:ok, by}
-    end
+    handle(%IncrementCount{by: by}, fn _repo, _changes ->
+      {:ok, {:ok, by}}
+    end)
 
-    def handle(%Fail{}, _context) do
-      {:error, :failed}
-    end
+    handle(%Fail{}, fn _repo, _changes ->
+      {:error, {:error, :failed}}
+    end)
 
-    def handle(%RaiseError{}, _context) do
+    handle(%RaiseError{}, fn _repo, _changes ->
       raise "failed"
-    end
+    end)
 
-    def handle(%Timeout{}, _context) do
+    handle(%Timeout{}, fn _repo, _changes ->
       :timer.sleep(1_000)
-      []
-    end
+      {:ok, []}
+    end)
 
-    def handle(%Validate{}, _context) do
+    handle(%Validate{}, fn _repo, _changes ->
+      {:ok, []}
+    end)
+
+    handle(%MultiRunError{}, fn _repo, _changes ->
       []
-    end
+    end)
   end
 end

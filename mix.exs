@@ -50,9 +50,18 @@ defmodule Commander.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: extra_applications(Mix.env()),
       mod: {Commander.Application, []}
     ]
+  end
+
+  # Include ecto and postgrex apps in `test` environment only
+  defp extra_applications(:test) do
+    [:logger, :ecto, :ecto_sql, :postgrex]
+  end
+
+  defp extra_applications(_env) do
+    [:logger]
   end
 
   defp aliases do
@@ -62,7 +71,9 @@ defmodule Commander.MixProject do
   defp deps do
     [
       {:elixir_uuid, "~> 1.2"},
-      {:ecto, ">= 3.1.7"},
+      {:ecto, "~> 3.1", runtime: false},
+      {:ecto_sql, "~> 3.1", runtime: false},
+      {:postgrex, "~> 0.15", only: :test},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end

@@ -1,4 +1,4 @@
-defmodule Commander.ExecutionContext do
+defmodule Commander.ExecutionResult do
   defstruct [
     :correlation_id,
     :timeout,

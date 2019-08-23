@@ -10,6 +10,7 @@ defmodule Commander.MiddlewareTest do
     Fail,
     RaiseError,
     Timeout,
+    MultiRunError,
     CommandHandler,
   }
 
@@ -45,7 +46,7 @@ defmodule Commander.MiddlewareTest do
   end
 
   defmodule Router do
-    use Commander.Router
+    use Commander.Router, repo: Commander.Repo
 
     middleware FirstMiddleware
     middleware ModifyMetadataMiddleware
@@ -56,7 +57,8 @@ defmodule Commander.MiddlewareTest do
                IncrementCount,
                Fail,
                RaiseError,
-               Timeout
+               Timeout,
+               MultiRunError
              ],
              to: CommandHandler
   end
@@ -69,9 +71,9 @@ defmodule Commander.MiddlewareTest do
   test "should call middleware for each command dispatch" do
     aggregate_uuid = UUID.uuid4()
 
-    {:ok, 1} = Router.dispatch(%IncrementCount{uuid: aggregate_uuid, by: 1})
-    {:ok, 2} = Router.dispatch(%IncrementCount{uuid: aggregate_uuid, by: 2})
-    {:ok, 3} = Router.dispatch(%IncrementCount{uuid: aggregate_uuid, by: 3})
+    {:ok, %{IncrementCount => {:ok, 1}}} = Router.dispatch(%IncrementCount{uuid: aggregate_uuid, by: 1})
+    {:ok, %{IncrementCount => {:ok, 2}}} = Router.dispatch(%IncrementCount{uuid: aggregate_uuid, by: 2})
+    {:ok, %{IncrementCount => {:ok, 3}}} = Router.dispatch(%IncrementCount{uuid: aggregate_uuid, by: 3})
 
     {dispatched, succeeded, failed} = CommandAuditMiddleware.count_commands()
 
@@ -88,7 +90,7 @@ defmodule Commander.MiddlewareTest do
 
   test "should execute middleware failure callback when aggregate process returns an error tagged tuple" do
     # force command handling to return an error
-    {:error, :failed} = Router.dispatch(%Fail{uuid: UUID.uuid4()})
+    {:error, Fail, {:error, :failed}, %{}} = Router.dispatch(%Fail{uuid: UUID.uuid4()})
 
     {dispatched, succeeded, failed} = CommandAuditMiddleware.count_commands()
 
@@ -99,7 +101,7 @@ defmodule Commander.MiddlewareTest do
 
   test "should execute middleware failure callback when aggregate process errors" do
     # force command handling to error
-    {:error, :execution_failed, {%RuntimeError{message: "failed"}, _}} =
+    {:error, %RuntimeError{message: "failed"}} =
       Router.dispatch(%RaiseError{uuid: UUID.uuid4()})
 
     {dispatched, succeeded, failed} = CommandAuditMiddleware.count_commands()
@@ -112,7 +114,7 @@ defmodule Commander.MiddlewareTest do
   test "should execute middleware failure callback when aggregate process dies" do
     # force command handling to timeout so the aggregate process is terminated
     :ok =
-      case Router.dispatch(%Timeout{uuid: UUID.uuid4()}, 50) do
+      case Router.dispatch(%Timeout{uuid: UUID.uuid4()}, timeout: 50) do
         {:error, :execution_timeout} -> :ok
         {:error, :execution_failed} -> :ok
       end
